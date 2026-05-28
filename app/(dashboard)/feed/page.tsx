@@ -33,7 +33,7 @@ export default function FeedPage() {
   async function runFeed() {
     setRunning(true)
     setRunResult(null)
-    const res = await fetch('/api/feed/cron')
+    const res = await fetch('/api/feed/run', { method: 'POST' })
     const data = await res.json()
     setRunResult(`Done — ${data.ingested ?? 0} items scanned, ${data.added ?? 0} added to database.`)
     setRunning(false)
