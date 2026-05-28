@@ -35,6 +35,7 @@ export default function DatabasePage() {
   const [filterTopic, setFilterTopic] = useState('all')
   const [filterRelevance, setFilterRelevance] = useState('all')
   const [filterStrength, setFilterStrength] = useState('1')
+  const [filterMinYear, setFilterMinYear] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editEntry, setEditEntry] = useState<ResearchEntry | null>(null)
   const [form, setForm] = useState<Partial<ResearchEntry>>(emptyForm())
@@ -47,12 +48,13 @@ export default function DatabasePage() {
       search, minStrength: filterStrength,
       ...(filterTopic !== 'all' && { topic: filterTopic }),
       ...(filterRelevance !== 'all' && { relevance: filterRelevance }),
+      ...(filterMinYear && { minYear: filterMinYear }),
     })
     const res = await fetch(`/api/entries?${params}`)
     const { data } = await res.json()
     setEntries(data ?? [])
     setLoading(false)
-  }, [search, filterTopic, filterRelevance, filterStrength])
+  }, [search, filterTopic, filterRelevance, filterStrength, filterMinYear])
 
   useEffect(() => { fetchEntries() }, [fetchEntries])
 
@@ -143,6 +145,20 @@ export default function DatabasePage() {
           </SelectTrigger>
           <SelectContent>
             {[1,2,3,4,5].map((n) => <SelectItem key={n} value={String(n)}>{n}+ stars</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterMinYear} onValueChange={(v) => setFilterMinYear(v === 'all' ? '' : (v ?? ''))}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="All years" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All years</SelectItem>
+            <SelectItem value="2020">2020+</SelectItem>
+            <SelectItem value="2021">2021+</SelectItem>
+            <SelectItem value="2022">2022+</SelectItem>
+            <SelectItem value="2023">2023+</SelectItem>
+            <SelectItem value="2024">2024+</SelectItem>
+            <SelectItem value="2025">2025+</SelectItem>
           </SelectContent>
         </Select>
       </div>

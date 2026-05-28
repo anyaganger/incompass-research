@@ -7,6 +7,7 @@ export async function GET(req: Request) {
   const audience = searchParams.get('audience') ?? ''
   const relevance = searchParams.get('relevance') ?? ''
   const minStrength = parseInt(searchParams.get('minStrength') ?? '1')
+  const minYear = searchParams.get('minYear') ?? ''
   const source = searchParams.get('source') ?? ''
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '200'), 500)
   const offset = parseInt(searchParams.get('offset') ?? '0')
@@ -41,6 +42,11 @@ export async function GET(req: Request) {
   if (source) {
     conditions.push(`source_firm ILIKE $${idx}`)
     params.push(`%${source}%`)
+    idx++
+  }
+  if (minYear) {
+    conditions.push(`published_year >= $${idx}`)
+    params.push(parseInt(minYear))
     idx++
   }
 
