@@ -12,6 +12,8 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState<string | null>(null)
+  const [runningSocial, setRunningSocial] = useState(false)
+  const [socialResult, setSocialResult] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [addSourceOpen, setAddSourceOpen] = useState(false)
   const [newSource, setNewSource] = useState({ name: '', url: '', keywords: '' })
@@ -29,6 +31,20 @@ export default function FeedPage() {
   }
 
   useEffect(() => { loadData() }, [])
+
+  async function runSocialSearch() {
+    setRunningSocial(true)
+    setSocialResult(null)
+    const res = await fetch('/api/feed/social', { method: 'POST' })
+    const data = await res.json()
+    if (data.error) {
+      setSocialResult(`Error: ${data.error}`)
+    } else {
+      setSocialResult(`Done — ${data.added ?? 0} findings added from X + web.`)
+    }
+    setRunningSocial(false)
+    loadData()
+  }
 
   async function runFeed() {
     setRunning(true)
@@ -86,14 +102,22 @@ export default function FeedPage() {
             {weekItems} items this week · {addedCount} auto-added to database
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {runResult && <p className="text-xs text-zinc-500">{runResult}</p>}
+          {socialResult && <p className="text-xs text-zinc-500">{socialResult}</p>}
+          <Button
+            onClick={runSocialSearch}
+            disabled={runningSocial}
+            variant="outline"
+          >
+            {runningSocial ? 'Searching…' : 'Search X + Web'}
+          </Button>
           <Button
             onClick={runFeed}
             disabled={running}
             className="bg-zinc-900 text-white hover:bg-zinc-700"
           >
-            {running ? 'Running…' : 'Run Feed Now'}
+            {running ? 'Running…' : 'Run RSS Feed'}
           </Button>
         </div>
       </div>
