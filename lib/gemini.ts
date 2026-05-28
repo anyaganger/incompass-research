@@ -131,3 +131,55 @@ Return plain text (no markdown formatting).`
     return ''
   }
 }
+
+export async function generateOpportunitiesFromEntries(
+  entries: { finding: string; source_firm: string; incompass_angle: string | null; opportunity_type: string | null; topics: string[] }[]
+): Promise<Array<{ title: string; description: string; opportunity_type: 'white_space' | 'narrative_gap' | 'competitor_blind_spot' }>> {
+  const key = process.env.GEMINI_API_KEY
+  if (!key || !entries.length) return []
+
+  const entriesText = entries
+    .map((e, i) =>
+      `${i + 1}. [${(e.opportunity_type ?? 'unknown').toUpperCase()}] ${e.finding} (${e.source_firm})\n   Incompass angle: ${e.incompass_angle ?? 'N/A'}`
+    )
+    .join('\n\n')
+
+  const prompt = `You are a GTM strategist for Incompass, an AI talent intelligence platform selling to PE firms, portco CEOs, and C-suite leaders.
+
+Based on these new research findings from today's feed, identify 1-3 strategic opportunities Incompass should act on. Only create an opportunity if the research reveals something genuinely actionable — a market gap, competitor weakness, or narrative Incompass should own.
+
+RESEARCH FINDINGS:
+${entriesText}
+
+Return ONLY valid JSON:
+{
+  "opportunities": [
+    {
+      "title": "Short, action-oriented title (10 words max)",
+      "description": "2-3 sentences on the strategic opportunity and why Incompass should act on it now",
+      "opportunity_type": "white_space" or "narrative_gap" or "competitor_blind_spot"
+    }
+  ]
+}
+
+If no new strategic opportunities emerge from these findings, return {"opportunities": []}.`
+
+  try {
+    const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, responseMimeType: 'application/json' },
+      }),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!text) return []
+    const parsed = JSON.parse(text) as { opportunities: Array<{ title: string; description: string; opportunity_type: 'white_space' | 'narrative_gap' | 'competitor_blind_spot' }> }
+    return parsed.opportunities ?? []
+  } catch {
+    return []
+  }
+}

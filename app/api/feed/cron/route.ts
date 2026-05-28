@@ -2,7 +2,7 @@ export const runtime = 'nodejs'
 
 import { getDb } from '@/lib/db'
 import { fetchFeed, itemMatchesKeywords } from '@/lib/rss'
-import { analyzeContent } from '@/lib/gemini'
+import { analyzeContent, generateOpportunitiesFromEntries } from '@/lib/gemini'
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -22,6 +22,7 @@ export async function GET(req: Request) {
 
   let totalIngested = 0
   let totalAdded = 0
+  const newEntries: { finding: string; source_firm: string; incompass_angle: string | null; opportunity_type: string | null; topics: string[] }[] = []
 
   for (const source of sources) {
     const items = await fetchFeed(source.url)
@@ -88,12 +89,32 @@ export async function GET(req: Request) {
               true, feedItemId,
             ]
           )
+          newEntries.push({
+            finding: finding.finding,
+            source_firm: analysis.source_firm || source.name,
+            incompass_angle: finding.incompass_angle ?? null,
+            opportunity_type: finding.opportunity_type ?? null,
+            topics: finding.topics ?? [],
+          })
           totalAdded++
         }
       }
     }
 
     await pool.query('UPDATE feed_sources SET last_fetched = NOW() WHERE id = $1', [source.id])
+  }
+
+  const opportunityEntries = newEntries.filter((e) =>
+    ['white_space', 'competitor_gap', 'new_use_case', 'new_buyer'].includes(e.opportunity_type ?? '')
+  )
+  if (opportunityEntries.length > 0) {
+    const opportunities = await generateOpportunitiesFromEntries(opportunityEntries)
+    for (const opp of opportunities) {
+      await pool.query(
+        `INSERT INTO opportunities (title, description, opportunity_type, status) VALUES ($1, $2, $3, 'active')`,
+        [opp.title, opp.description, opp.opportunity_type]
+      )
+    }
   }
 
   return Response.json({ ok: true, ingested: totalIngested, added: totalAdded })
