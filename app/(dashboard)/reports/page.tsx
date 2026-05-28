@@ -146,7 +146,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Button onClick={downloadCSV} disabled={!filtered.length} variant="outline">
           Export CSV ({filtered.length})
         </Button>
@@ -183,7 +183,7 @@ export default function ReportsPage() {
       {!loading && filtered.length > 0 && (
         <div>
           <h2 className="mb-3 text-sm font-semibold text-zinc-700">Preview</h2>
-          <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
             <table className="w-full text-sm">
               <thead className="border-b border-zinc-100 bg-zinc-50">
                 <tr>

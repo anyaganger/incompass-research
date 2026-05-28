@@ -115,7 +115,7 @@ export default function DatabasePage() {
           placeholder="Search findings, sources…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-64"
+          className="w-full sm:w-64"
         />
         <Select value={filterTopic} onValueChange={(v) => setFilterTopic(v ?? 'all')}>
           <SelectTrigger className="w-44">
@@ -148,7 +148,7 @@ export default function DatabasePage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
         {loading ? (
           <div className="flex h-40 items-center justify-center text-sm text-zinc-400">Loading…</div>
         ) : entries.length === 0 ? (
@@ -288,7 +288,7 @@ export default function DatabasePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1">Relevance</label>
                 <Select value={form.incompass_relevance ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, incompass_relevance: v as ResearchEntry['incompass_relevance'] }))}>
