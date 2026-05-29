@@ -1,7 +1,7 @@
 export const runtime = 'nodejs'
 
 import { getDb } from '@/lib/db'
-import { searchXForFindings, searchWebForFindings } from '@/lib/xai'
+import { searchXForFindings, searchWebForFindings, xaiErrors } from '@/lib/xai'
 import { generateOpportunitiesFromEntries } from '@/lib/gemini'
 
 export async function POST() {
@@ -21,7 +21,7 @@ export async function POST() {
 
   const [xResults, webResults] = await Promise.all([
     searchXForFindings(),
-    searchWebForFindings(['linkedin.com']),
+    searchWebForFindings(),
   ])
 
   for (const analysis of [...xResults, ...webResults]) {
@@ -72,5 +72,11 @@ export async function POST() {
     }
   }
 
-  return Response.json({ ok: true, added: totalAdded, x: xResults.length, web: webResults.length })
+  return Response.json({
+    ok: true,
+    added: totalAdded,
+    x: xResults.length,
+    web: webResults.length,
+    debug: xaiErrors.slice(-5),
+  })
 }

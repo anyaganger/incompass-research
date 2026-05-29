@@ -183,3 +183,51 @@ If no new strategic opportunities emerge from these findings, return {"opportuni
     return []
   }
 }
+
+export async function generateTalkingPoint(entry: {
+  finding: string
+  source_firm: string
+  incompass_angle: string | null
+  audience_fit: string[]
+}): Promise<string> {
+  const key = process.env.GEMINI_API_KEY
+  if (!key) return ''
+
+  const audienceMap: Record<string, string> = {
+    pe_firms: 'PE firms and operating partners',
+    c_suite: 'C-suite executives',
+    hr: 'HR leaders',
+    all: 'enterprise buyers',
+  }
+  const audience =
+    entry.audience_fit.map((a) => audienceMap[a] ?? a).join(', ') || 'enterprise buyers'
+
+  const prompt = `You are a GTM strategist for Incompass, an AI talent intelligence platform.
+
+Write a 2-3 sentence talking point for a ${audience} audience based on this research finding. Requirements:
+- Lead with the specific statistic or insight (punchy and credible)
+- Connect it to a real business pain that audience faces
+- Naturally position Incompass as the solution (bias-reduced talent decisions, fast calibration, performance management)
+
+FINDING: ${entry.finding}
+SOURCE: ${entry.source_firm}
+INCOMPASS ANGLE: ${entry.incompass_angle ?? 'N/A'}
+
+Return ONLY the talking point text — no labels, no headers, no quotation marks.`
+
+  try {
+    const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.5 },
+      }),
+    })
+    if (!res.ok) return ''
+    const data = await res.json()
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}

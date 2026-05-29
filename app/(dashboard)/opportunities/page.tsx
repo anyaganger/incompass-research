@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 
 const TYPE_STYLES: Record<string, string> = {
   white_space: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -32,6 +31,7 @@ const emptyForm = (): Partial<Opportunity> => ({
 
 export default function OpportunitiesPage() {
   const [opps, setOpps] = useState<Opportunity[]>([])
+  const [trendingTypes, setTrendingTypes] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editOpp, setEditOpp] = useState<Opportunity | null>(null)
@@ -42,8 +42,9 @@ export default function OpportunitiesPage() {
   async function loadOpps() {
     setLoading(true)
     const res = await fetch('/api/opportunities')
-    const { data } = await res.json()
+    const { data, trending_types } = await res.json()
     setOpps(data ?? [])
+    setTrendingTypes(trending_types ?? [])
     setLoading(false)
   }
 
@@ -105,6 +106,11 @@ export default function OpportunitiesPage() {
           <h1 className="text-xl font-semibold text-zinc-900">Opportunities</h1>
           <p className="mt-0.5 text-sm text-zinc-500">
             {opps.filter((o) => o.status === 'active').length} active · {opps.length} total
+            {trendingTypes.length > 0 && (
+              <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                {trendingTypes.length} type{trendingTypes.length > 1 ? 's' : ''} trending
+              </span>
+            )}
           </p>
         </div>
         <Button onClick={openAdd} className="bg-zinc-900 text-white hover:bg-zinc-700">
@@ -117,7 +123,7 @@ export default function OpportunitiesPage() {
       ) : opps.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center">
           <p className="text-sm text-zinc-500">No opportunities yet.</p>
-          <p className="mt-1 text-xs text-zinc-400">Create your first opportunity to track white space and narrative gaps.</p>
+          <p className="mt-1 text-xs text-zinc-400">Create your first opportunity or run the feed to auto-generate.</p>
           <Button onClick={openAdd} variant="outline" className="mt-4 text-sm">New Opportunity</Button>
         </div>
       ) : (
@@ -125,11 +131,19 @@ export default function OpportunitiesPage() {
           {Object.entries(grouped).map(([type, list]) => {
             if (!list.length) return null
             const typeInfo = OPP_TYPES.find((t) => t.value === type)
+            const isTrending = trendingTypes.includes(type)
             return (
               <div key={type}>
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  {typeInfo?.label ?? 'Uncategorized'} ({list.length})
-                </h2>
+                <div className="mb-3 flex items-center gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    {typeInfo?.label ?? 'Uncategorized'} ({list.length})
+                  </h2>
+                  {isTrending && (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 animate-pulse">
+                      ↑ Trending Now
+                    </span>
+                  )}
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {list.map((o) => (
                     <div
@@ -154,7 +168,7 @@ export default function OpportunitiesPage() {
                         )}
                         {o.supporting_entry_ids?.length > 0 && (
                           <span className="ml-auto text-xs text-zinc-400">
-                            {o.supporting_entry_ids.length} supporting entries
+                            {o.supporting_entry_ids.length} supporting
                           </span>
                         )}
                       </div>
@@ -180,7 +194,7 @@ export default function OpportunitiesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-zinc-700 mb-1">Description / Memo</label>
-              <Textarea value={form.description ?? ''} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="What does the data show? What's the opportunity for Incompass? Why doesn't the market address this yet?" rows={5} />
+              <Textarea value={form.description ?? ''} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="What does the data show? What's the opportunity for Incompass?" rows={5} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -223,7 +237,7 @@ export default function OpportunitiesPage() {
                 <DialogTitle className="pr-8">{detailOpp.title}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-1">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {detailOpp.opportunity_type && (
                     <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[detailOpp.opportunity_type] ?? ''}`}>
                       {OPP_TYPES.find((t) => t.value === detailOpp.opportunity_type)?.label ?? detailOpp.opportunity_type}
@@ -232,6 +246,11 @@ export default function OpportunitiesPage() {
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[detailOpp.status]}`}>
                     {detailOpp.status}
                   </span>
+                  {trendingTypes.includes(detailOpp.opportunity_type ?? '') && (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                      ↑ Trending Now
+                    </span>
+                  )}
                 </div>
                 {detailOpp.description && (
                   <p className="text-sm text-zinc-700 whitespace-pre-wrap">{detailOpp.description}</p>

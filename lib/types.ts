@@ -17,6 +17,11 @@ export interface ResearchEntry {
   incompass_angle: string | null
   ai_generated: boolean
   feed_item_id: string | null
+  votes_up?: number
+  votes_down?: number
+  competitors_mentioned?: string[]
+  used_in_outreach?: boolean
+  weighted_score?: number
 }
 
 export interface FeedSource {

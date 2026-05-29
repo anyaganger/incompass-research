@@ -18,6 +18,7 @@ export default function FeedPage() {
   const [addSourceOpen, setAddSourceOpen] = useState(false)
   const [newSource, setNewSource] = useState({ name: '', url: '', keywords: '' })
   const [savingSource, setSavingSource] = useState(false)
+  const [promoting, setPromoting] = useState<Set<string>>(new Set())
 
   async function loadData() {
     setLoading(true)
@@ -67,6 +68,33 @@ export default function FeedPage() {
 
   async function deleteSource(id: string) {
     await fetch(`/api/sources/${id}`, { method: 'DELETE' })
+    loadData()
+  }
+
+  async function promoteItem(item: FeedItem & { source_name?: string }) {
+    setPromoting((prev) => new Set(prev).add(item.id))
+    const analysis = item.ai_analysis as { findings?: { finding: string; context?: string; incompass_angle?: string; topics?: string[]; audience_fit?: string[]; incompass_relevance?: string; opportunity_type?: string; strength_rating?: number }[] } | null
+    const findings = analysis?.findings ?? []
+    for (const f of findings) {
+      await fetch('/api/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          finding: f.finding,
+          context: f.context ?? null,
+          source_firm: item.source_name ?? 'Feed',
+          topics: f.topics ?? [],
+          audience_fit: f.audience_fit ?? [],
+          incompass_relevance: f.incompass_relevance ?? null,
+          opportunity_type: f.opportunity_type ?? null,
+          strength_rating: f.strength_rating ?? 3,
+          incompass_angle: f.incompass_angle ?? null,
+          ai_generated: true,
+          feed_item_id: item.id,
+        }),
+      })
+    }
+    setPromoting((prev) => { const s = new Set(prev); s.delete(item.id); return s })
     loadData()
   }
 
@@ -161,6 +189,14 @@ export default function FeedPage() {
                       )}
                       {item.added_to_db ? (
                         <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Added</Badge>
+                      ) : (item.ai_analysis as { findings?: unknown[] } | null)?.findings?.length ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); promoteItem(item) }}
+                          disabled={promoting.has(item.id)}
+                          className="rounded bg-zinc-900 px-2 py-0.5 text-xs text-white hover:bg-zinc-700 disabled:opacity-50"
+                        >
+                          {promoting.has(item.id) ? 'Adding…' : 'Promote'}
+                        </button>
                       ) : (
                         <Badge variant="outline" className="text-zinc-400">Skipped</Badge>
                       )}

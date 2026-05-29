@@ -5,7 +5,7 @@ export async function GET() {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   try {
-    const [totalsRes, feedRes, topRes, topicsRes] = await Promise.all([
+    const [totalsRes, feedRes, topRes, topicsRes, trendingRes] = await Promise.all([
       pool.query(
         `SELECT
            (SELECT COUNT(*) FROM research_entries)::int AS total_entries,
@@ -27,6 +27,29 @@ export async function GET() {
          ORDER BY strength_rating DESC, created_at DESC LIMIT 5`
       ),
       pool.query('SELECT topics FROM research_entries'),
+      // Trending topics: most velocity in last 30 days
+      pool.query(`
+        WITH recent AS (
+          SELECT unnest(topics) AS topic, COUNT(*)::int AS count
+          FROM research_entries
+          WHERE created_at >= NOW() - INTERVAL '30 days'
+          GROUP BY 1
+        ),
+        prev AS (
+          SELECT unnest(topics) AS topic, COUNT(*)::int AS count
+          FROM research_entries
+          WHERE created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days'
+          GROUP BY 1
+        )
+        SELECT r.topic, r.count AS recent_count,
+          ROUND(CASE WHEN COALESCE(p.count,0) = 0 THEN r.count::numeric
+               ELSE r.count::numeric / p.count::numeric END, 2)::float AS velocity
+        FROM recent r
+        LEFT JOIN prev p ON p.topic = r.topic
+        WHERE r.count >= 2
+        ORDER BY velocity DESC, recent_count DESC
+        LIMIT 4
+      `),
     ])
 
     const topicCounts: Record<string, number> = {}
@@ -48,6 +71,7 @@ export async function GET() {
       entries_by_topic: Object.entries(topicCounts)
         .map(([topic, count]) => ({ topic, count }))
         .sort((a, b) => b.count - a.count),
+      trending_topics: trendingRes.rows,
     })
   } catch (e) {
     return Response.json({ error: String(e) }, { status: 500 })
