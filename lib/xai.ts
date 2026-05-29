@@ -1,6 +1,8 @@
+// Web search via Gemini Google Search grounding — free, no xAI credits needed
 import type { GeminiAnalysis } from './types'
 
-const XAI_URL = 'https://api.x.ai/v1/responses'
+const GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
 const SYSTEM_INSTRUCTIONS = `You are a research analyst for Incompass, an AI-powered talent intelligence and performance management platform.
 
@@ -10,13 +12,13 @@ Target buyers: PE firms (optimizing portfolio companies post-acquisition), C-sui
 Core value prop: "The only talent intelligence tool that cuts through the bias, so you can make fair talent decisions – fast."
 
 YOUR TASK:
-Search the web for the given query. Extract the 1-3 most compelling findings with concrete statistics, practitioner insights, or research data relevant to Incompass's GTM. Focus on: leadership effectiveness, talent cost, performance measurement, bias in talent decisions, PE value creation, workforce performance.
+Use web search to find recent articles, research, or data on the given query. Extract the 1-3 most compelling findings with concrete statistics, practitioner insights, or research data relevant to Incompass's GTM. Focus on: leadership effectiveness, talent cost, performance measurement, bias in talent decisions, PE value creation, workforce performance.
 
 Return ONLY valid JSON matching this exact structure (no prose, no markdown, just JSON):
 {
   "relevant": true,
   "source_firm": "name of author/org/publication",
-  "report_name": "post title or search topic",
+  "report_name": "post title or article name",
   "findings": [
     {
       "finding": "verbatim quote or close paraphrase of the key stat or claim",
@@ -33,43 +35,50 @@ Return ONLY valid JSON matching this exact structure (no prose, no markdown, jus
 
 Only include findings with strength_rating >= 3. If nothing relevant is found, return {"relevant": false, "source_firm": "", "report_name": "", "findings": []}.`
 
-// All queries use web_search — x_search is not a supported tool per xAI docs
-const ALL_QUERIES = [
-  'leadership effectiveness CEO performance impact company results statistics research 2024 2025',
-  'cost of bad hire mis-hire executive failure rate research statistics',
-  'performance management broken annual reviews ineffective talent measurement',
+const SEARCH_QUERIES = [
+  'leadership effectiveness CEO performance impact on company results statistics 2024 2025',
+  'cost of bad hire mis-hire executive failure rate research data statistics',
+  'performance management broken annual reviews ineffective workforce 2025',
   'private equity portfolio company talent management value creation people',
-  'bias in performance reviews unfair ratings talent decisions research data',
-  'employee engagement workforce productivity measurement ROI statistics',
-  'PE private equity talent leadership portco value creation 2025',
-  'cost executive mis-hire leadership failure statistics research',
-  'workforce performance measurement data HR analytics 2025',
+  'bias in performance reviews unfair ratings talent decisions research',
+  'employee engagement workforce productivity measurement ROI data',
+  'PE private equity talent leadership portco operating partner 2025',
+  'workforce performance measurement HR analytics data research 2025',
+  'cost executive mis-hire leadership failure statistics recent research',
 ]
 
-// Exported so social route can surface errors for debugging
 export const xaiErrors: string[] = []
 
-async function callXAI(query: string): Promise<GeminiAnalysis | null> {
-  const key = process.env.GROK_API_KEY
+async function searchWithGemini(query: string): Promise<GeminiAnalysis | null> {
+  const key = process.env.GEMINI_API_KEY
   if (!key) return null
 
   try {
-    const res = await fetch(XAI_URL, {
+    const res = await fetch(`${GEMINI_URL}?key=${key}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'grok-4.3',
-        instructions: SYSTEM_INSTRUCTIONS,
-        input: [
+        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTIONS }] },
+        contents: [
           {
-            role: 'user',
-            content: `Search for: "${query}". Extract findings with concrete statistics or strong practitioner claims. Return only the JSON structure specified — no other text.`,
+            parts: [
+              {
+                text: `Search for recent data on: "${query}". Extract findings with concrete statistics or strong practitioner claims. Return only the JSON structure specified — no other text.`,
+              },
+            ],
           },
         ],
-        tools: [{ type: 'web_search' }],
+        tools: [
+          {
+            google_search_retrieval: {
+              dynamic_retrieval_config: {
+                mode: 'MODE_DYNAMIC',
+                dynamic_threshold: 0.3,
+              },
+            },
+          },
+        ],
+        generationConfig: { temperature: 0.2 },
       }),
     })
 
@@ -80,48 +89,34 @@ async function callXAI(query: string): Promise<GeminiAnalysis | null> {
       return null
     }
 
-    // xAI Responses API: output is an array of items; find the assistant message
-    const outputItems: Record<string, unknown>[] = data?.output ?? []
-    const msgItem =
-      outputItems.find((o) => o.role === 'assistant') ??
-      outputItems.find((o) => o.type === 'message')
-    const contentArr: Record<string, unknown>[] = Array.isArray(msgItem?.content)
-      ? (msgItem!.content as Record<string, unknown>[])
-      : []
-    const text = (
-      contentArr.find((c) => c.type === 'text' || c.type === 'output_text')?.text ??
-      (typeof msgItem?.content === 'string' ? msgItem.content : undefined)
-    ) as string | undefined
-
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined
     if (!text) {
-      xaiErrors.push(
-        `No text. Keys: ${Object.keys(data).join(',')} | items: ${outputItems.length} | first: ${JSON.stringify(outputItems[0] ?? {}).slice(0, 200)}`
-      )
+      xaiErrors.push(`No text in Gemini response for query: ${query.slice(0, 60)}`)
       return null
     }
 
     const match = text.match(/\{[\s\S]*\}/)
     if (!match) {
-      xaiErrors.push(`No JSON in text: ${text.slice(0, 200)}`)
+      xaiErrors.push(`No JSON found in response: ${text.slice(0, 150)}`)
       return null
     }
 
     return JSON.parse(match[0]) as GeminiAnalysis
   } catch (e) {
-    xaiErrors.push(`Exception: ${String(e)}`)
+    xaiErrors.push(`Exception for "${query.slice(0, 40)}": ${String(e)}`)
     return null
   }
 }
 
 export async function searchXForFindings(): Promise<GeminiAnalysis[]> {
-  const results = await Promise.all(ALL_QUERIES.slice(0, 6).map((q) => callXAI(q)))
+  const results = await Promise.all(SEARCH_QUERIES.slice(0, 6).map(searchWithGemini))
   return results.filter(
     (r): r is GeminiAnalysis => r !== null && r.relevant && (r.findings?.length ?? 0) > 0
   )
 }
 
 export async function searchWebForFindings(): Promise<GeminiAnalysis[]> {
-  const results = await Promise.all(ALL_QUERIES.slice(6).map((q) => callXAI(q)))
+  const results = await Promise.all(SEARCH_QUERIES.slice(6).map(searchWithGemini))
   return results.filter(
     (r): r is GeminiAnalysis => r !== null && r.relevant && (r.findings?.length ?? 0) > 0
   )

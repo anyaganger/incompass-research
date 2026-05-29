@@ -41,7 +41,7 @@ export default function FeedPage() {
     if (data.error) {
       setSocialResult(`Error: ${data.error}`)
     } else {
-      setSocialResult(`Done — ${data.added ?? 0} findings added from X + web.`)
+      setSocialResult(`Done — ${data.added ?? 0} findings added from web.`)
     }
     setRunningSocial(false)
     loadData()
@@ -138,7 +138,7 @@ export default function FeedPage() {
             disabled={runningSocial}
             variant="outline"
           >
-            {runningSocial ? 'Searching…' : 'Search X + Web'}
+            {runningSocial ? 'Searching…' : 'Search Web'}
           </Button>
           <Button
             onClick={runFeed}

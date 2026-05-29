@@ -5,8 +5,8 @@ import { searchXForFindings, searchWebForFindings, xaiErrors } from '@/lib/xai'
 import { generateOpportunitiesFromEntries } from '@/lib/gemini'
 
 export async function POST() {
-  if (!process.env.GROK_API_KEY) {
-    return Response.json({ error: 'GROK_API_KEY not configured' }, { status: 503 })
+  if (!process.env.GEMINI_API_KEY) {
+    return Response.json({ error: 'GEMINI_API_KEY not configured' }, { status: 503 })
   }
 
   const pool = getDb()
