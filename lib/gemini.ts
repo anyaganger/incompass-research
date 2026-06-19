@@ -181,6 +181,82 @@ If no new strategic opportunities emerge from these findings, return {"opportuni
   }
 }
 
+export type ContentFormat = 'linkedin' | 'newsletter' | 'article'
+
+export async function generateContent(
+  format: ContentFormat,
+  findings: { finding: string; source_firm: string; published_year: number | null; report_url: string | null; incompass_angle: string | null; topics: string[] }[],
+  angle?: string
+): Promise<string> {
+  const key = process.env.GEMINI_API_KEY
+  if (!key || !findings.length) return ''
+
+  const findingsText = findings
+    .map((f, i) => {
+      const citation = f.published_year ? `${f.source_firm} ${f.published_year}` : f.source_firm
+      return `${i + 1}. "${f.finding}" — ${citation}${f.incompass_angle ? `\n   PE angle: ${f.incompass_angle}` : ''}`
+    })
+    .join('\n\n')
+
+  const angleNote = angle ? `\nNARRATIVE ANGLE / TOPIC: ${angle}\n` : ''
+
+  const formatInstructions: Record<ContentFormat, string> = {
+    linkedin: `Write a LinkedIn post for Nechama Jacobson, CEO of Incompass. Format:
+- 150–250 words total
+- Open with a punchy, data-backed hook — one stat that stops the scroll
+- 2–3 short paragraphs that build the argument using the research data
+- Frame everything for a PE or C-suite audience: portcos, hold periods, EBITDA, value creation
+- Close with 1–2 sentences positioning Incompass — the only talent intelligence tool built for PE, not HR
+- Add 3–4 relevant hashtags at the end (#PrivateEquity #TalentIntelligence #Leadership #PE)
+- Do NOT use emojis. Keep the tone direct, credible, founder-voice.
+- Cite each stat inline like this: (Gallup, 2026) or (Deloitte Global Human Capital Trends, 2026)`,
+
+    newsletter: `Write a newsletter issue for Incompass's "PE Talent Intelligence" newsletter. Format:
+- Subject line on its own line: "Subject: ..."
+- Preview text on its own line: "Preview: ..."
+- 450–650 words of body copy
+- Open with a 2-sentence executive summary framed for PE operating partners
+- Group findings into 2–3 themed sections with short section headers
+- Each section: 1 key finding with context, then the Incompass angle (what this means for portco operations, value creation, or deal diligence)
+- Close with a "So What for PE" paragraph — 2–3 actionable takeaways
+- Professional, data-driven tone. No fluff. PE language throughout (portco, hold period, EBITDA, succession risk, talent diligence).
+- Cite each stat inline: (Source, Year)`,
+
+    article: `Write a thought leadership article for Nechama Jacobson, CEO of Incompass. Format:
+- Headline on its own line: "Headline: ..."
+- 700–950 words
+- Strong thesis in the opening paragraph: PE firms are sitting on a talent risk they can't see yet
+- Weave 4–6 research findings throughout as evidence — not a list, but integrated into the argument
+- Build to the case that HR tools are structurally wrong for PE (they report to HR, not the investment team)
+- Position Incompass as the solution in the final section — 1 paragraph, not salesy, just logical
+- Byline-ready tone: authoritative, first-person perspective from a PE talent expert
+- Cite each stat inline: (Source, Year)`,
+  }
+
+  const prompt = `${formatInstructions[format]}
+${angleNote}
+RESEARCH FINDINGS FROM INCOMPASS DATABASE:
+${findingsText}
+
+Write ONLY the content — no preamble, no "here is your draft", no meta-commentary. Output the content itself, ready to publish.`
+
+  try {
+    const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.6 },
+      }),
+    })
+    if (!res.ok) return ''
+    const data = await res.json()
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export async function generateTalkingPoint(entry: {
   finding: string
   source_firm: string
