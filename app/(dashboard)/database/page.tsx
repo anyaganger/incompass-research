@@ -206,7 +206,7 @@ export default function DatabasePage() {
           <SelectTrigger className="w-28"><SelectValue placeholder="All years" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All years</SelectItem>
-            {[2020,2021,2022,2023,2024,2025].map((y) => (
+            {[2020,2021,2022,2023,2024,2025,2026].map((y) => (
               <SelectItem key={y} value={String(y)}>{y}+</SelectItem>
             ))}
           </SelectContent>
@@ -266,13 +266,24 @@ export default function DatabasePage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">
-                      {e.source_firm}
-                      {e.published_year && (
-                        <span className={`ml-1 ${stale ? 'text-amber-500' : 'text-zinc-400'}`} title={stale ? 'Data may be outdated' : ''}>
-                          {e.published_year}{stale ? ' ⚠' : ''}
-                        </span>
-                      )}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div>
+                        {e.report_url ? (
+                          <a href={e.report_url} target="_blank" rel="noreferrer" className="font-medium text-zinc-800 hover:text-zinc-900 hover:underline">
+                            {e.source_firm}
+                          </a>
+                        ) : (
+                          <span className="text-zinc-600">{e.source_firm}</span>
+                        )}
+                        {e.published_year && (
+                          <span className={`ml-1 text-xs ${stale ? 'text-amber-500' : 'text-zinc-400'}`} title={stale ? 'Data may be outdated' : ''}>
+                            {e.published_year}{stale ? ' ⚠' : ''}
+                          </span>
+                        )}
+                        {e.report_name && (
+                          <p className="mt-0.5 max-w-[160px] truncate text-xs text-zinc-400" title={e.report_name}>{e.report_name}</p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">

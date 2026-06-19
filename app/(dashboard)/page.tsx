@@ -108,7 +108,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-zinc-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">Research intelligence overview for Incompass GTM</p>
+        <p className="mt-1 text-sm text-zinc-500">PE talent intelligence — tracking the data that moves portco valuations</p>
       </div>
 
       {/* Stats */}

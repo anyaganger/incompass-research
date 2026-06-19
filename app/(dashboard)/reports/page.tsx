@@ -91,7 +91,7 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-zinc-900">Reports</h1>
-        <p className="mt-0.5 text-sm text-zinc-500">Filter and export research for GTM use</p>
+        <p className="mt-0.5 text-sm text-zinc-500">Filter and export stat packs for PE firm outreach, portco pitches, and C-suite conversations</p>
       </div>
 
       {/* Filters */}
@@ -155,7 +155,7 @@ export default function ReportsPage() {
           disabled={!filtered.length || generatingBriefing}
           className="bg-zinc-900 text-white hover:bg-zinc-700"
         >
-          {generatingBriefing ? 'Generating…' : 'Generate Monthly Briefing'}
+          {generatingBriefing ? 'Generating…' : 'Generate PE Intelligence Briefing'}
         </Button>
       </div>
 
@@ -189,7 +189,7 @@ export default function ReportsPage() {
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Finding</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Source</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Incompass Angle</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">PE / GTM Angle</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">★</th>
                 </tr>
               </thead>
@@ -199,8 +199,22 @@ export default function ReportsPage() {
                     <td className="max-w-xs px-4 py-3">
                       <p className="line-clamp-2 text-zinc-800">{e.finding}</p>
                     </td>
-                    <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">
-                      {e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      {e.report_url ? (
+                        <a
+                          href={e.report_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-600 hover:underline"
+                        >
+                          {e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}
+                        </a>
+                      ) : (
+                        <span className="text-zinc-500">{e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}</span>
+                      )}
+                      {e.report_name && (
+                        <p className="mt-0.5 max-w-[180px] truncate text-zinc-400" title={e.report_name}>{e.report_name}</p>
+                      )}
                     </td>
                     <td className="max-w-sm px-4 py-3">
                       <p className="line-clamp-2 text-xs text-zinc-500">{e.incompass_angle}</p>

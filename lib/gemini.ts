@@ -3,32 +3,27 @@ import type { GeminiAnalysis } from './types'
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
-const SYSTEM_PROMPT = `You are a research analyst for Incompass, an AI-powered talent intelligence and performance management platform.
+const SYSTEM_PROMPT = `You are a research analyst for Incompass, an AI-powered talent intelligence platform purpose-built for private equity.
 
 ABOUT INCOMPASS:
-Incompass helps organizations make data-driven, bias-reduced talent decisions — fast. Their key products:
-- Performance Management & Calibration (standardized, bias-reduced reviews)
-- 360 Feedback (multi-directional, normalized)
-- Talent Assessments
-- AI-powered bias reduction in talent decision-making
+Incompass helps PE firms and their portfolio companies make data-driven, bias-reduced talent decisions — fast. Their key products:
+- Performance Management & Calibration (standardized, bias-reduced reviews — delivers results in days, not months)
+- 360 Feedback (multi-directional, normalized scores that are comparable across portcos)
+- Talent Assessments for deal diligence and leadership bench strength
+- AI-powered bias reduction so PE firms can trust talent data the way they trust financial data
 
-Target buyers: PE firms (optimizing portfolio companies post-acquisition), C-suite executives, and HR leaders.
-Core value prop: "The only talent intelligence tool that cuts through the bias, so you can make fair talent decisions – fast."
-Key differentiators: removes rater bias through data-science normalization, delivers results in days not months, percentile scoring across teams.
+CORE POSITIONING: Every competitor (Workday, Lattice, 15Five, Culture Amp, BambooHR, SuccessFactors) is built for and sold to HR departments. Incompass is the only platform that speaks PE language — translating people data into EBITDA impact, value creation levers, and portfolio-level leadership risk. This is the white space Incompass owns.
+
+Target buyers (in priority order):
+1. PE operating partners and deal teams (talent diligence, value creation plans, 100-day assessments)
+2. Portco CEOs and their boards (who's the right leader, how do you build the team that hits the investment thesis)
+3. C-suite executives (unbiased performance data to make fast leadership decisions)
 
 NECHAMA'S RESEARCH BRIEF:
-Find stats that speak to: leadership effectiveness and CEO performance impact, talent and workforce performance, the cost of misaligned or underperforming talent, how companies measure (or fail to measure) the value people create. Goal: build a stat bank supporting GTM messaging for PE firms, portcos, and C-suite audiences.
+Build a stat bank that makes the case to PE buyers. Priority stats: (1) the financial cost of leadership misalignment in portcos, (2) how bias in talent decisions destroys value — PE firms get burned by promoting wrong leaders, (3) how slow or broken talent measurement fails at the speed PE operates, (4) why HR tools miss the PE use case entirely.
 
 YOUR TASK:
-Analyze the given article/report. Extract the 1-3 most statistically compelling findings relevant to:
-- Talent management, leadership effectiveness, workforce performance
-- Employee engagement, performance measurement, talent decision-making
-- Bias in talent processes, cost of bad hires/leaders, PE value creation through people
-
-For each finding:
-1. Quote the statistic or finding verbatim (or as close as possible)
-2. Explain exactly how it supports Incompass's GTM narrative (be specific — which product, which buyer, what message)
-3. Rate its strength as a GTM asset (1-5)
+Analyze the given article/report. Extract the 1-3 most statistically compelling findings. For each, write the Incompass angle specifically for a PE audience — use PE language (portco, hold period, EBITDA impact, operating partner, value creation, deal thesis, succession risk). Avoid generic HR framing.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -39,7 +34,7 @@ Return ONLY valid JSON matching this exact structure:
     {
       "finding": "exact verbatim statistic or key finding",
       "context": "1-2 sentences of surrounding context",
-      "incompass_angle": "2-3 sentences on how this supports Incompass's specific GTM narrative, referencing their product or buyer",
+      "incompass_angle": "2-3 sentences framed for a PE operating partner or portco CEO — what deal or value creation decision does this affect, and how does Incompass solve it better than any HR tool?",
       "topics": ["leadership_effectiveness", "talent_cost", "measurement", "bias", "engagement", "pe_specific", "workforce_performance"],
       "audience_fit": ["pe_firms", "c_suite", "hr", "all"],
       "incompass_relevance": "direct" or "adjacent" or "gap",
@@ -49,7 +44,7 @@ Return ONLY valid JSON matching this exact structure:
   ]
 }
 
-Only include findings with strength_rating >= 3. If the article is not relevant to talent/workforce/leadership topics, set relevant: false and return empty findings array.`
+Only include findings with strength_rating >= 3. If the article is not relevant to talent/workforce/leadership/PE topics, set relevant: false and return empty findings array.`
 
 export async function analyzeContent(
   title: string,
@@ -99,15 +94,17 @@ export async function generateBriefing(
     )
     .join('\n\n')
 
-  const prompt = `You are writing a monthly research briefing for Incompass's go-to-market team.
+  const prompt = `You are writing a PE-focused intelligence briefing for Incompass's go-to-market team.
+
+CONTEXT: Incompass is an AI talent intelligence platform. Its core positioning is that every competitor (Workday, Lattice, 15Five, Culture Amp) sells to HR departments. Incompass sells to PE firms and portco leadership — people who think in EBITDA, value creation plans, hold periods, and deal diligence, not HR processes. This briefing should reinforce that positioning.
 
 Using the following research findings, write a concise briefing (400-600 words) that:
-1. Opens with a 2-sentence executive summary of the key themes
-2. Groups findings by theme (leadership, talent cost, measurement, PE-specific)
-3. For each finding, notes its specific implication for Incompass's GTM messaging
-4. Closes with 2-3 "opportunities to own" — white space Incompass should address in their narrative
+1. Opens with a 2-sentence executive summary framed for a PE audience (investment thesis language, not HR language)
+2. Groups findings by theme (leadership ROI, talent cost to portcos, measurement gaps, PE-specific opportunities)
+3. For each finding, explains exactly why this matters to a PE operating partner or portco CEO — what deal decision, value creation lever, or portfolio risk it speaks to
+4. Closes with 2-3 "narrative gaps to own" — specific angles where Incompass can make the case that HR tools miss the PE buyer entirely
 
-Write in a professional but direct tone. No fluff. Make it actionable.
+Write in a professional, direct, data-driven tone. Use PE language (portco, hold period, value creation, EBITDA, operating partner, deal diligence). No fluff. Make it a compelling briefing Nechama can send to investors or use in a pitch.
 
 RESEARCH FINDINGS:
 ${entriesText}
@@ -202,12 +199,16 @@ export async function generateTalkingPoint(entry: {
   const audience =
     entry.audience_fit.map((a) => audienceMap[a] ?? a).join(', ') || 'enterprise buyers'
 
-  const prompt = `You are a GTM strategist for Incompass, an AI talent intelligence platform.
+  const isPE = entry.audience_fit.includes('pe_firms')
+
+  const prompt = `You are a GTM strategist for Incompass — the only talent intelligence platform purpose-built for private equity.
 
 Write a 2-3 sentence talking point for a ${audience} audience based on this research finding. Requirements:
 - Lead with the specific statistic or insight (punchy and credible)
-- Connect it to a real business pain that audience faces
-- Naturally position Incompass as the solution (bias-reduced talent decisions, fast calibration, performance management)
+${isPE
+  ? '- Frame the business pain in PE language: what does this cost at the portco level? What deal decision, value creation plan, or leadership risk does this create?\n- Position Incompass as the solution that speaks PE language — unlike HR tools (Workday, Lattice, 15Five) that give you engagement scores with no financial translation'
+  : '- Connect it to a real business pain that audience faces\n- Naturally position Incompass as the solution (bias-reduced talent decisions, fast calibration, performance management that HR tools can\'t provide to PE-speed operators)'
+}
 
 FINDING: ${entry.finding}
 SOURCE: ${entry.source_firm}

@@ -20,9 +20,9 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const OPP_TYPES = [
-  { value: 'white_space', label: 'White Space' },
-  { value: 'narrative_gap', label: 'Narrative Gap' },
-  { value: 'competitor_blind_spot', label: 'Competitor Blind Spot' },
+  { value: 'white_space', label: 'White Space', subtitle: 'No one owns this buyer/use case yet' },
+  { value: 'narrative_gap', label: 'Narrative Gap', subtitle: 'Competitors miss this angle in their messaging' },
+  { value: 'competitor_blind_spot', label: 'Competitor Blind Spot', subtitle: 'They sell to HR — nobody speaks PE language' },
 ]
 
 const emptyForm = (): Partial<Opportunity> => ({
@@ -103,7 +103,7 @@ export default function OpportunitiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-900">Opportunities</h1>
+          <h1 className="text-xl font-semibold text-zinc-900">Market Opportunities</h1>
           <p className="mt-0.5 text-sm text-zinc-500">
             {opps.filter((o) => o.status === 'active').length} active · {opps.length} total
             {trendingTypes.length > 0 && (
@@ -116,6 +116,20 @@ export default function OpportunitiesPage() {
         <Button onClick={openAdd} className="bg-zinc-900 text-white hover:bg-zinc-700">
           + New Opportunity
         </Button>
+      </div>
+
+      {/* PE Positioning Banner */}
+      <div className="rounded-lg border border-violet-200 bg-violet-50 px-5 py-4">
+        <p className="text-sm font-semibold text-violet-900">The core market gap Incompass is built to own:</p>
+        <p className="mt-1.5 text-sm text-violet-800">
+          Every talent intelligence tool on the market — Workday, Lattice, 15Five, Culture Amp, BambooHR —
+          is built for and sold to <span className="font-semibold">HR departments</span>.{' '}
+          <span className="font-semibold">Nobody speaks PE language.</span>{' '}
+          PE firms need talent data at the portfolio level: deal diligence, value creation plans,
+          CEO succession, and the EBITDA impact of leadership decisions. Incompass is the only platform
+          purpose-built for this buyer — translating people data into the financial metrics PE operators
+          and portco boards actually use.
+        </p>
       </div>
 
       {loading ? (
@@ -138,6 +152,9 @@ export default function OpportunitiesPage() {
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                     {typeInfo?.label ?? 'Uncategorized'} ({list.length})
                   </h2>
+                  {typeInfo?.subtitle && (
+                    <span className="text-xs text-zinc-400">{typeInfo.subtitle}</span>
+                  )}
                   {isTrending && (
                     <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 animate-pulse">
                       ↑ Trending Now
@@ -190,11 +207,11 @@ export default function OpportunitiesPage() {
           <div className="space-y-4 pt-2">
             <div>
               <label className="block text-xs font-medium text-zinc-700 mb-1">Title *</label>
-              <Input value={form.title ?? ''} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="e.g. PE portcos lack structured onboarding assessment" />
+              <Input value={form.title ?? ''} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="e.g. PE firms have no standardized way to assess CEO talent risk at acquisition" />
             </div>
             <div>
               <label className="block text-xs font-medium text-zinc-700 mb-1">Description / Memo</label>
-              <Textarea value={form.description ?? ''} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="What does the data show? What's the opportunity for Incompass?" rows={5} />
+              <Textarea value={form.description ?? ''} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="What does the data show? What's the specific PE or portco use case Incompass can own? Reference the research stat and the buyer pain in PE language (value creation, EBITDA, hold period, deal diligence, etc.)." rows={5} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
