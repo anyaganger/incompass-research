@@ -2,7 +2,7 @@
 import type { GeminiAnalysis } from './types'
 
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
 const SYSTEM_INSTRUCTIONS = `You are a research analyst for Incompass, an AI-powered talent intelligence and performance management platform.
 

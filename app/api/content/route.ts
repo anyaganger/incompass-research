@@ -70,10 +70,11 @@ export async function POST(req: Request) {
     return Response.json({ error: 'No findings in database yet. Add some entries first.' }, { status: 400 })
   }
 
-  const draft = await generateContent(format, rows, angle)
-
-  if (!draft) {
-    return Response.json({ error: 'Content generation failed. Check GEMINI_API_KEY.' }, { status: 500 })
+  let draft: string
+  try {
+    draft = await generateContent(format, rows, angle)
+  } catch (e) {
+    return Response.json({ error: String(e) }, { status: 500 })
   }
 
   return Response.json({

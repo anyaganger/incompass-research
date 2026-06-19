@@ -1,7 +1,7 @@
 import type { GeminiAnalysis } from './types'
 
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
 const SYSTEM_PROMPT = `You are a research analyst for Incompass, an AI-powered talent intelligence platform purpose-built for private equity.
 
@@ -240,21 +240,25 @@ ${findingsText}
 
 Write ONLY the content — no preamble, no "here is your draft", no meta-commentary. Output the content itself, ready to publish.`
 
-  try {
-    const res = await fetch(`${GEMINI_URL}?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.6 },
-      }),
-    })
-    if (!res.ok) return ''
-    const data = await res.json()
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? ''
-  } catch {
-    return ''
+  const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.6 },
+    }),
+  })
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}))
+    const msg = (errBody as { error?: { message?: string } })?.error?.message ?? `HTTP ${res.status}`
+    throw new Error(`Gemini API error: ${msg}`)
   }
+
+  const data = await res.json()
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+  if (!text) throw new Error('Gemini returned an empty response')
+  return text
 }
 
 export async function generateTalkingPoint(entry: {
