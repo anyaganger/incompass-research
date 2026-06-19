@@ -1,14 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import type { ResearchEntry } from '@/lib/types'
-import { TOPICS, AUDIENCE_FIT, INCOMPASS_RELEVANCE, OPPORTUNITY_TYPES } from '@/lib/types'
+import { TOPICS } from '@/lib/types'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
-const topicLabel = (v: string) => TOPICS.find((t) => t.value === v)?.label ?? v
-const audLabel = (v: string) => AUDIENCE_FIT.find((t) => t.value === v)?.label ?? v
-const relLabel = (v: string) => INCOMPASS_RELEVANCE.find((t) => t.value === v)?.label.split(' ')[0] ?? v
-const oppLabel = (v: string) => OPPORTUNITY_TYPES.find((t) => t.value === v)?.label ?? v
 
 function csvEscape(v: string) {
   if (v.includes(',') || v.includes('"') || v.includes('\n')) {
@@ -17,219 +13,191 @@ function csvEscape(v: string) {
   return v
 }
 
+const TOPIC_LABEL: Record<string, string> = Object.fromEntries(
+  TOPICS.map((t) => [t.value, t.label])
+)
+
 export default function ReportsPage() {
   const [entries, setEntries] = useState<ResearchEntry[]>([])
-  const [filtered, setFiltered] = useState<ResearchEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterAudience, setFilterAudience] = useState('all')
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [filterTopic, setFilterTopic] = useState('all')
-  const [filterRelevance, setFilterRelevance] = useState('all')
-  const [filterStrength, setFilterStrength] = useState('3')
-  const [briefing, setBriefing] = useState<string | null>(null)
-  const [generatingBriefing, setGeneratingBriefing] = useState(false)
+  const [filterAudience, setFilterAudience] = useState('all')
 
   useEffect(() => {
-    fetch('/api/entries?limit=500')
+    fetch('/api/entries?limit=500&sort=weighted')
       .then((r) => r.json())
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) setError(error)
         setEntries(data ?? [])
+        setLoading(false)
+      })
+      .catch((e) => {
+        setError(String(e))
         setLoading(false)
       })
   }, [])
 
-  useEffect(() => {
-    let result = entries
-    if (filterAudience !== 'all') result = result.filter((e) => e.audience_fit?.includes(filterAudience))
-    if (filterTopic !== 'all') result = result.filter((e) => e.topics?.includes(filterTopic))
-    if (filterRelevance !== 'all') result = result.filter((e) => e.incompass_relevance === filterRelevance)
-    result = result.filter((e) => e.strength_rating >= parseInt(filterStrength))
-    setFiltered(result)
-    setBriefing(null)
-  }, [entries, filterAudience, filterTopic, filterRelevance, filterStrength])
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return entries.filter((e) => {
+      if (q && !e.finding.toLowerCase().includes(q) && !e.source_firm.toLowerCase().includes(q) && !(e.report_name ?? '').toLowerCase().includes(q)) return false
+      if (filterTopic !== 'all' && !(e.topics ?? []).includes(filterTopic)) return false
+      if (filterAudience !== 'all' && !(e.audience_fit ?? []).includes(filterAudience)) return false
+      return true
+    })
+  }, [entries, search, filterTopic, filterAudience])
 
   function downloadCSV() {
-    const headers = ['Finding', 'Context', 'Source Firm', 'Report Name', 'URL', 'Year', 'Topics', 'Audience', 'Relevance', 'Opportunity Type', 'Strength', 'Incompass Angle', 'Notes']
-    const rows = filtered.map((e) => [
-      e.finding, e.context ?? '', e.source_firm, e.report_name ?? '',
-      e.report_url ?? '', String(e.published_year ?? ''),
-      (e.topics ?? []).map(topicLabel).join('; '),
-      (e.audience_fit ?? []).map(audLabel).join('; '),
-      e.incompass_relevance ?? '', e.opportunity_type ?? '',
-      String(e.strength_rating), e.incompass_angle ?? '', e.notes ?? '',
-    ].map(csvEscape).join(','))
-
+    const headers = ['Finding', 'Context', 'Source', 'Report', 'URL', 'Year', 'Topics', 'Strength', 'PE Angle']
+    const rows = filtered.map((e) =>
+      [
+        e.finding,
+        e.context ?? '',
+        e.source_firm,
+        e.report_name ?? '',
+        e.report_url ?? '',
+        String(e.published_year ?? ''),
+        (e.topics ?? []).map((t) => TOPIC_LABEL[t] ?? t).join('; '),
+        String(e.strength_rating),
+        e.incompass_angle ?? '',
+      ]
+        .map(csvEscape)
+        .join(',')
+    )
     const csv = [headers.join(','), ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `incompass-research-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `incompass-findings-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  async function generateBriefing() {
-    setGeneratingBriefing(true)
-    setBriefing(null)
-    const payload = filtered.slice(0, 30).map((e) => ({
-      finding: e.finding,
-      source_firm: e.source_firm,
-      incompass_angle: e.incompass_angle,
-      topics: e.topics,
-    }))
-    const res = await fetch('/api/briefing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entries: payload }),
-    })
-    const data = await res.json()
-    setBriefing(data.briefing ?? 'Failed to generate.')
-    setGeneratingBriefing(false)
-  }
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900">Reports</h1>
-        <p className="mt-0.5 text-sm text-zinc-500">Filter and export stat packs for PE firm outreach, portco pitches, and C-suite conversations</p>
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-zinc-900">Reports</h1>
+          <p className="mt-0.5 text-sm text-zinc-500">
+            {loading ? 'Loading…' : `${filtered.length} finding${filtered.length !== 1 ? 's' : ''} from primary sources`}
+          </p>
+        </div>
+        <Button
+          onClick={downloadCSV}
+          disabled={loading || !filtered.length}
+          variant="outline"
+          className="shrink-0"
+        >
+          Export CSV ({filtered.length})
+        </Button>
       </div>
 
       {/* Filters */}
-      <div className="rounded-lg border border-zinc-200 bg-white p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Filters</p>
-        <div className="flex flex-wrap gap-3">
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">Audience</label>
-            <Select value={filterAudience} onValueChange={(v) => setFilterAudience(v ?? 'all')}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {AUDIENCE_FIT.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">Topic</label>
-            <Select value={filterTopic} onValueChange={(v) => setFilterTopic(v ?? 'all')}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All topics</SelectItem>
-                {TOPICS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">Relevance</label>
-            <Select value={filterRelevance} onValueChange={(v) => setFilterRelevance(v ?? 'all')}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="direct">Direct</SelectItem>
-                <SelectItem value="adjacent">Adjacent</SelectItem>
-                <SelectItem value="gap">Gap</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">Min strength</label>
-            <Select value={filterStrength} onValueChange={(v) => setFilterStrength(v ?? '1')}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {[1,2,3,4,5].map((n) => <SelectItem key={n} value={String(n)}>{n}+ stars</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-zinc-400">
-          {loading ? 'Loading…' : `${filtered.length} of ${entries.length} entries match`}
-        </p>
-      </div>
-
-      {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={downloadCSV} disabled={!filtered.length} variant="outline">
-          Export CSV ({filtered.length})
-        </Button>
-        <Button
-          onClick={generateBriefing}
-          disabled={!filtered.length || generatingBriefing}
-          className="bg-zinc-900 text-white hover:bg-zinc-700"
-        >
-          {generatingBriefing ? 'Generating…' : 'Generate PE Intelligence Briefing'}
-        </Button>
+        <Input
+          placeholder="Search findings, sources…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-64"
+        />
+        <Select value={filterTopic} onValueChange={(v) => setFilterTopic(v ?? 'all')}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="All topics" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All topics</SelectItem>
+            {TOPICS.map((t) => (
+              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterAudience} onValueChange={(v) => setFilterAudience(v ?? 'all')}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All audiences" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All audiences</SelectItem>
+            <SelectItem value="pe_firms">PE Firms</SelectItem>
+            <SelectItem value="c_suite">C-Suite</SelectItem>
+            <SelectItem value="hr">HR</SelectItem>
+          </SelectContent>
+        </Select>
+        {(search || filterTopic !== 'all' || filterAudience !== 'all') && (
+          <button
+            onClick={() => { setSearch(''); setFilterTopic('all'); setFilterAudience('all') }}
+            className="text-xs text-zinc-400 hover:text-zinc-700 self-center"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
-      {/* Briefing output */}
-      {briefing && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-zinc-700">
-              Monthly Briefing — {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </h2>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(briefing)
-              }}
-              className="text-xs text-zinc-400 hover:text-zinc-700"
-            >
-              Copy
-            </button>
-          </div>
-          <pre className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">{briefing}</pre>
+      {/* Error */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
       )}
 
-      {/* Preview table */}
-      {!loading && filtered.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-zinc-700">Preview</h2>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="border-b border-zinc-100 bg-zinc-50">
-                <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Finding</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Source</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">PE / GTM Angle</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">★</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filtered.slice(0, 50).map((e) => (
-                  <tr key={e.id}>
-                    <td className="max-w-xs px-4 py-3">
-                      <p className="line-clamp-2 text-zinc-800">{e.finding}</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap">
-                      {e.report_url ? (
-                        <a
-                          href={e.report_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium text-blue-600 hover:underline"
-                        >
-                          {e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}
-                        </a>
-                      ) : (
-                        <span className="text-zinc-500">{e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}</span>
-                      )}
-                      {e.report_name && (
-                        <p className="mt-0.5 max-w-[180px] truncate text-zinc-400" title={e.report_name}>{e.report_name}</p>
-                      )}
-                    </td>
-                    <td className="max-w-sm px-4 py-3">
-                      <p className="line-clamp-2 text-xs text-zinc-500">{e.incompass_angle}</p>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">{'★'.repeat(e.strength_rating)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filtered.length > 50 && (
-              <div className="border-t border-zinc-100 px-4 py-2 text-xs text-zinc-400">
-                Showing 50 of {filtered.length}. Export CSV to get all.
+      {/* Findings list */}
+      {loading ? (
+        <div className="flex h-40 items-center justify-center text-sm text-zinc-400">
+          Loading findings…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex h-40 items-center justify-center text-sm text-zinc-400">
+          No findings match your filters.
+        </div>
+      ) : (
+        <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white">
+          {filtered.map((e) => (
+            <div key={e.id} className="px-5 py-4">
+              {/* Finding */}
+              <p className="text-sm leading-relaxed text-zinc-800">
+                &ldquo;{e.finding}&rdquo;
+              </p>
+
+              {/* Source row */}
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                {e.report_url ? (
+                  <a
+                    href={e.report_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    {e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}
+                  </a>
+                ) : (
+                  <span className="text-xs font-medium text-zinc-500">
+                    {e.source_firm}{e.published_year ? ` ${e.published_year}` : ''}
+                  </span>
+                )}
+
+                {e.report_name && (
+                  <span className="text-xs text-zinc-400 truncate max-w-xs" title={e.report_name}>
+                    · {e.report_name}
+                  </span>
+                )}
+
+                <span className="ml-auto text-xs text-zinc-300 tabular-nums">
+                  {'★'.repeat(e.strength_rating)}{'☆'.repeat(5 - e.strength_rating)}
+                </span>
               </div>
-            )}
-          </div>
+
+              {/* PE angle — only when present */}
+              {e.incompass_angle && (
+                <p className="mt-2 text-xs text-zinc-500 leading-relaxed border-l-2 border-zinc-200 pl-3">
+                  {e.incompass_angle}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
