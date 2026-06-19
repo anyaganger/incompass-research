@@ -1,7 +1,7 @@
 export const runtime = 'nodejs'
 
 import { getDb } from '@/lib/db'
-import { searchXForFindings, searchWebForFindings, xaiErrors } from '@/lib/xai'
+import { searchXForFindings, searchWebForFindings, xaiErrors, type GeminiAnalysisWithUrl } from '@/lib/xai'
 import { generateOpportunitiesFromEntries } from '@/lib/gemini'
 
 export async function POST() {
@@ -24,19 +24,20 @@ export async function POST() {
     searchWebForFindings(),
   ])
 
-  for (const analysis of [...xResults, ...webResults]) {
+  for (const analysis of [...xResults, ...webResults] as GeminiAnalysisWithUrl[]) {
     for (const finding of (analysis.findings ?? []).filter((f) => f.strength_rating >= 3)) {
       await pool.query(
         `INSERT INTO research_entries
-           (finding, context, source_firm, report_name,
+           (finding, context, source_firm, report_name, report_url,
             topics, audience_fit, incompass_relevance, opportunity_type,
             strength_rating, incompass_angle, ai_generated)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [
           finding.finding,
           finding.context ?? null,
-          analysis.source_firm || 'X / Social',
+          analysis.source_firm || 'Web Search',
           analysis.report_name || null,
+          analysis.source_url ?? null,            // ← grounding URL from Gemini
           finding.topics ?? [],
           finding.audience_fit ?? [],
           finding.incompass_relevance ?? null,

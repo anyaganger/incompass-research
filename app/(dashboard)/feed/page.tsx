@@ -83,6 +83,11 @@ export default function FeedPage() {
           finding: f.finding,
           context: f.context ?? null,
           source_firm: item.source_name ?? 'Feed',
+          report_name: item.title ?? null,
+          report_url: item.url ?? null,          // ← pass the feed item URL
+          published_year: item.published_at
+            ? new Date(item.published_at).getFullYear()
+            : null,
           topics: f.topics ?? [],
           audience_fit: f.audience_fit ?? [],
           incompass_relevance: f.incompass_relevance ?? null,

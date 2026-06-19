@@ -47,9 +47,11 @@ const SEARCH_QUERIES = [
   'cost executive mis-hire leadership failure statistics recent research',
 ]
 
+export type GeminiAnalysisWithUrl = GeminiAnalysis & { source_url: string | null }
+
 export const xaiErrors: string[] = []
 
-async function searchWithGemini(query: string): Promise<GeminiAnalysis | null> {
+async function searchWithGemini(query: string): Promise<GeminiAnalysisWithUrl | null> {
   const key = process.env.GEMINI_API_KEY
   if (!key) return null
 
@@ -89,11 +91,17 @@ async function searchWithGemini(query: string): Promise<GeminiAnalysis | null> {
       return null
     }
 
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined
+    const candidate = data?.candidates?.[0]
+    const text = candidate?.content?.parts?.[0]?.text as string | undefined
     if (!text) {
       xaiErrors.push(`No text in Gemini response for query: ${query.slice(0, 60)}`)
       return null
     }
+
+    // Extract the primary source URL from Gemini's grounding metadata
+    const chunks = candidate?.groundingMetadata?.groundingChunks as
+      Array<{ web?: { uri?: string; title?: string } }> | undefined
+    const source_url = chunks?.find((c) => c.web?.uri)?.web?.uri ?? null
 
     const match = text.match(/\{[\s\S]*\}/)
     if (!match) {
@@ -101,23 +109,24 @@ async function searchWithGemini(query: string): Promise<GeminiAnalysis | null> {
       return null
     }
 
-    return JSON.parse(match[0]) as GeminiAnalysis
+    const parsed = JSON.parse(match[0]) as GeminiAnalysis
+    return { ...parsed, source_url }
   } catch (e) {
     xaiErrors.push(`Exception for "${query.slice(0, 40)}": ${String(e)}`)
     return null
   }
 }
 
-export async function searchXForFindings(): Promise<GeminiAnalysis[]> {
+export async function searchXForFindings(): Promise<GeminiAnalysisWithUrl[]> {
   const results = await Promise.all(SEARCH_QUERIES.slice(0, 6).map(searchWithGemini))
   return results.filter(
-    (r): r is GeminiAnalysis => r !== null && r.relevant && (r.findings?.length ?? 0) > 0
+    (r): r is GeminiAnalysisWithUrl => r !== null && r.relevant && (r.findings?.length ?? 0) > 0
   )
 }
 
-export async function searchWebForFindings(): Promise<GeminiAnalysis[]> {
+export async function searchWebForFindings(): Promise<GeminiAnalysisWithUrl[]> {
   const results = await Promise.all(SEARCH_QUERIES.slice(6).map(searchWithGemini))
   return results.filter(
-    (r): r is GeminiAnalysis => r !== null && r.relevant && (r.findings?.length ?? 0) > 0
+    (r): r is GeminiAnalysisWithUrl => r !== null && r.relevant && (r.findings?.length ?? 0) > 0
   )
 }
