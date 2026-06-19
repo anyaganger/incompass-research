@@ -235,7 +235,7 @@ export default function FeedPage() {
             <thead className="border-b border-zinc-100 bg-zinc-50">
               <tr>
                 <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Source</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">URL</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Scanning For</th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Last Fetched</th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Status</th>
                 <th className="px-4 py-2.5"></th>
@@ -244,9 +244,18 @@ export default function FeedPage() {
             <tbody className="divide-y divide-zinc-100">
               {sources.map((s) => (
                 <tr key={s.id} className="group">
-                  <td className="px-4 py-3 font-medium text-zinc-800">{s.name}</td>
                   <td className="px-4 py-3">
-                    <a href={s.url} target="_blank" rel="noreferrer" className="truncate text-xs text-zinc-400 hover:text-zinc-700 max-w-xs block">{s.url}</a>
+                    <p className="font-medium text-zinc-800">{s.name}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(s.keywords ?? []).slice(0, 4).map((kw) => (
+                        <span key={kw} className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">{kw}</span>
+                      ))}
+                      {(s.keywords ?? []).length > 4 && (
+                        <span className="text-xs text-zinc-400">+{s.keywords.length - 4} more</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-zinc-400">
                     {s.last_fetched ? new Date(s.last_fetched).toLocaleDateString() : 'Never'}
