@@ -1,3 +1,4 @@
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { getDb } from '@/lib/db'
 import { detectCompetitors, WEIGHTED_SCORE_SQL } from '@/lib/scoring'
 
@@ -74,6 +75,25 @@ export async function GET(req: Request) {
        LIMIT $${idx} OFFSET $${idx + 1}`,
       params
     )
+
+    // Overlay the current user's votes (best-effort — skips if entry_votes doesn't exist)
+    try {
+      const { userId } = await auth()
+      if (userId && rows.length > 0) {
+        const ids = rows.map((r) => r.id)
+        const votesRes = await pool.query(
+          `SELECT entry_id, vote_type FROM entry_votes
+           WHERE clerk_user_id = $1 AND entry_id = ANY($2::uuid[])`,
+          [userId, ids]
+        )
+        const voteMap: Record<string, string> = {}
+        for (const v of votesRes.rows) voteMap[v.entry_id] = v.vote_type
+        for (const row of rows) row.my_vote = voteMap[row.id] ?? null
+      }
+    } catch {
+      // entry_votes table may not exist yet — no-op
+    }
+
     return Response.json({ data: rows })
   } catch (e) {
     return Response.json({ error: String(e) }, { status: 500 })
@@ -87,13 +107,30 @@ export async function POST(req: Request) {
   const allText = [b.finding, b.context ?? '', b.incompass_angle ?? ''].join(' ')
   const competitors = detectCompetitors(allText)
 
+  // Get the creating user's identity
+  let createdByClerkId: string | null = null
+  let createdByName: string | null = null
+  try {
+    const { userId } = await auth()
+    if (userId) {
+      createdByClerkId = userId
+      const user = await currentUser()
+      createdByName = user?.firstName
+        ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
+        : (user?.emailAddresses[0]?.emailAddress ?? null)
+    }
+  } catch {
+    // If auth fails (e.g. cron-triggered insert), just leave null
+  }
+
   try {
     const { rows } = await pool.query(
       `INSERT INTO research_entries
          (finding, context, source_firm, report_name, report_url, published_year,
           topics, audience_fit, incompass_relevance, opportunity_type, strength_rating,
-          notes, incompass_angle, ai_generated, feed_item_id, competitors_mentioned)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          notes, incompass_angle, ai_generated, feed_item_id, competitors_mentioned,
+          created_by_clerk_id, created_by_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
         b.finding, b.context ?? null, b.source_firm, b.report_name ?? null,
@@ -103,6 +140,7 @@ export async function POST(req: Request) {
         b.strength_rating ?? 3, b.notes ?? null, b.incompass_angle ?? null,
         b.ai_generated ?? false, b.feed_item_id ?? null,
         b.competitors_mentioned ?? competitors,
+        createdByClerkId, createdByName,
       ]
     )
     return Response.json({ data: rows[0] }, { status: 201 })

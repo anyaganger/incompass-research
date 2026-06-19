@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import { useUser } from '@clerk/nextjs'
 import type { ResearchEntry } from '@/lib/types'
 import { TOPICS, AUDIENCE_FIT, INCOMPASS_RELEVANCE, OPPORTUNITY_TYPES } from '@/lib/types'
 import { COMPETITORS } from '@/lib/scoring'
@@ -59,8 +60,9 @@ export default function DatabasePage() {
   const [tpLoading, setTpLoading] = useState(false)
   const [tpCopied, setTpCopied] = useState(false)
 
-  // Vote optimistic state: id → { up, down }
-  const [voteCounts, setVoteCounts] = useState<Record<string, { votes_up: number; votes_down: number }>>({})
+  // Vote optimistic state: id → { up, down, my_vote }
+  const [voteCounts, setVoteCounts] = useState<Record<string, { votes_up: number; votes_down: number; my_vote: string | null }>>({})
+  const { user } = useUser()
 
   const fetchEntries = useCallback(async () => {
     setLoading(true)
@@ -116,16 +118,20 @@ export default function DatabasePage() {
     }))
   }
 
-  async function handleVote(entry: ResearchEntry, vote: 'up' | 'down') {
+  async function handleVote(entry: ResearchEntry & { my_vote?: string | null }, vote: 'up' | 'down') {
     const cur = voteCounts[entry.id] ?? {
       votes_up: entry.votes_up ?? 0,
       votes_down: entry.votes_down ?? 0,
+      my_vote: (entry as { my_vote?: string | null }).my_vote ?? null,
     }
+    // Optimistic update
+    const isToggle = cur.my_vote === vote
     setVoteCounts((prev) => ({
       ...prev,
       [entry.id]: {
-        votes_up: vote === 'up' ? cur.votes_up + 1 : cur.votes_up,
-        votes_down: vote === 'down' ? cur.votes_down + 1 : cur.votes_down,
+        votes_up: vote === 'up' ? (isToggle ? cur.votes_up - 1 : cur.votes_up + 1) : cur.votes_up,
+        votes_down: vote === 'down' ? (isToggle ? cur.votes_down - 1 : cur.votes_down + 1) : cur.votes_down,
+        my_vote: isToggle ? null : vote,
       },
     }))
     const res = await fetch(`/api/entries/${entry.id}/vote`, {
@@ -251,7 +257,11 @@ export default function DatabasePage() {
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {entries.map((e) => {
-                const votes = voteCounts[e.id] ?? { votes_up: e.votes_up ?? 0, votes_down: e.votes_down ?? 0 }
+                const votes = voteCounts[e.id] ?? {
+                  votes_up: e.votes_up ?? 0,
+                  votes_down: e.votes_down ?? 0,
+                  my_vote: (e as ResearchEntry & { my_vote?: string | null }).my_vote ?? null,
+                }
                 const stale = isStale(e)
                 return (
                   <tr key={e.id} className="group hover:bg-zinc-50">
@@ -312,18 +322,33 @@ export default function DatabasePage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => handleVote(e, 'up')}
-                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 hover:bg-green-50 hover:text-green-600"
+                          onClick={() => handleVote(e as ResearchEntry & { my_vote?: string | null }, 'up')}
+                          title={votes.my_vote === 'up' ? 'Click to remove upvote' : 'Upvote'}
+                          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors ${
+                            votes.my_vote === 'up'
+                              ? 'bg-green-100 text-green-700 font-semibold'
+                              : 'text-zinc-500 hover:bg-green-50 hover:text-green-600'
+                          }`}
                         >
                           👍 {votes.votes_up}
                         </button>
                         <button
-                          onClick={() => handleVote(e, 'down')}
-                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 hover:bg-red-50 hover:text-red-500"
+                          onClick={() => handleVote(e as ResearchEntry & { my_vote?: string | null }, 'down')}
+                          title={votes.my_vote === 'down' ? 'Click to remove downvote' : 'Downvote'}
+                          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors ${
+                            votes.my_vote === 'down'
+                              ? 'bg-red-100 text-red-600 font-semibold'
+                              : 'text-zinc-500 hover:bg-red-50 hover:text-red-500'
+                          }`}
                         >
                           👎 {votes.votes_down}
                         </button>
                       </div>
+                      {(e as ResearchEntry & { created_by_name?: string }).created_by_name && (
+                        <p className="mt-1 text-xs text-zinc-400">
+                          by {(e as ResearchEntry & { created_by_name?: string }).created_by_name}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

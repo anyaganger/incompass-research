@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
+import { UserButton, useUser } from '@clerk/nextjs'
 import { cn } from '@/lib/utils'
 
 const tabs = [
@@ -13,13 +14,7 @@ const tabs = [
 
 export function Nav() {
   const pathname = usePathname()
-  const router = useRouter()
-
-  async function handleSignOut() {
-    await fetch('/api/auth', { method: 'DELETE' })
-    router.push('/login')
-    router.refresh()
-  }
+  const { user } = useUser()
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white">
@@ -47,13 +42,18 @@ export function Nav() {
               ))}
             </nav>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-zinc-400 hover:text-zinc-600"
-          >
-            Sign out
-          </button>
+
+          {/* User section */}
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="hidden sm:block text-xs text-zinc-400">
+                {user.firstName || user.emailAddresses[0]?.emailAddress}
+              </span>
+            )}
+            <UserButton />
+          </div>
         </div>
+
         {/* Scrollable tab row on mobile */}
         <div className="sm:hidden -mx-4 overflow-x-auto border-t border-zinc-100">
           <nav className="flex items-center gap-0.5 px-3 py-2">
